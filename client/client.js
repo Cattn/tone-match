@@ -10,6 +10,7 @@ class ToneMatchClient {
         this.masterGain = null;
         this.toneGain = null;
         this.currentTone = null;
+        this.currentColor = null;
         this.isRecording = false;
         this.isPlaying = false;
         this.recordTimeoutId = null;
@@ -58,17 +59,24 @@ class ToneMatchClient {
             this.stopToneDetection();
             this.stopTone();
             this.updateRecordButton();
+            this.currentTone = null;
+            this.currentColor = null;
+            const colorEl = document.getElementById('pair-color-indicator');
+            if (colorEl) colorEl.style.background = 'transparent';
             this.showWaitingState();
         });
         
         this.socket.on('round-start', (data) => {
             this.currentTone = data.tone;
+            this.currentColor = data.color || null;
             this.isRecording = false;
             this.stopToneDetection();
             this.stopTone();
             this.updateRecordButton();
             const recordBtn = document.getElementById('record-btn');
             if (recordBtn) recordBtn.style.borderColor = '#fff';
+            const colorEl = document.getElementById('pair-color-indicator');
+            if (colorEl) colorEl.style.background = this.currentColor || 'transparent';
             this.showPlayingState();
         });
         
@@ -96,6 +104,9 @@ class ToneMatchClient {
                     el.setAttribute('data-diff', String(data.diff));
                     el.setAttribute('data-tone', String(data.tone));
                 }
+            }
+            if (data && data.color) {
+                this.currentColor = data.color;
             }
             if (this.pendingStateTimeoutId) {
                 clearTimeout(this.pendingStateTimeoutId);
@@ -127,6 +138,9 @@ class ToneMatchClient {
             this.stopTone();
             this.updateRecordButton();
             this.currentTone = null;
+            this.currentColor = null;
+            const colorEl = document.getElementById('pair-color-indicator');
+            if (colorEl) colorEl.style.background = 'transparent';
             const now = performance.now();
             const minDisplayMs = 1000;
             const elapsed = now - this.lastCompletionShownAt;
@@ -147,6 +161,9 @@ class ToneMatchClient {
             this.stopTone();
             this.updateRecordButton();
             this.currentTone = null;
+            this.currentColor = null;
+            const colorEl = document.getElementById('pair-color-indicator');
+            if (colorEl) colorEl.style.background = 'transparent';
             const now = performance.now();
             const minDisplayMs = 1000;
             const elapsed = now - this.lastCompletionShownAt;
@@ -167,6 +184,9 @@ class ToneMatchClient {
             this.stopTone();
             this.updateRecordButton();
             this.currentTone = null;
+            this.currentColor = null;
+            const colorEl = document.getElementById('pair-color-indicator');
+            if (colorEl) colorEl.style.background = 'transparent';
             if (this.pendingStateTimeoutId) {
                 clearTimeout(this.pendingStateTimeoutId);
                 this.pendingStateTimeoutId = null;

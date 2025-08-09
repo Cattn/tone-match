@@ -22,6 +22,7 @@ interface GamePair {
   startTime: number;
   completed: boolean;
   completionTime?: number;
+  color: string;
 }
 
 interface GameState {
@@ -159,6 +160,7 @@ export class GameManager {
       const player2 = pairablePlayers[i + 1];
       
       const sharedTone = this.getUniqueTone();
+      const pairColor = this.getRandomColor();
       
       player1.assignedTone = sharedTone;
       player2.assignedTone = sharedTone;
@@ -171,14 +173,17 @@ export class GameManager {
         player1: player1.id,
         player2: player2.id,
         startTime: Date.now(),
-        completed: false
+        completed: false,
+        color: pairColor
       });
 
       this.io.to(player1.id).emit('round-start', { 
-        tone: sharedTone
+        tone: sharedTone,
+        color: pairColor
       });
       this.io.to(player2.id).emit('round-start', { 
-        tone: sharedTone
+        tone: sharedTone,
+        color: pairColor
       });
     }
 
@@ -209,6 +214,14 @@ export class GameManager {
     return this.allTones.filter(tone => !this.usedTones.has(tone));
   }
 
+  private getRandomColor(): string {
+    const colors = [
+      '#FF5733', '#33FF57', '#3357FF', '#FF33A8', '#33FFF5', '#F5FF33', '#FF8C33', '#8C33FF',
+      '#33FF8C', '#FF3333', '#33A8FF', '#A833FF', '#33FFA8', '#FFA833', '#FF33F6', '#33FFD7'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
   private completePair(playerId: string, partnerId: string, details?: { tone: number; diff: number }) {
     const player = this.game.players.get(playerId);
     const partner = this.game.players.get(partnerId);
@@ -227,8 +240,8 @@ export class GameManager {
     player.completionTime = pair.completionTime;
     partner.completionTime = pair.completionTime;
 
-    this.io.to(playerId).emit('pair-completed', { time: pair.completionTime, tone: details?.tone, diff: details?.diff });
-    this.io.to(partnerId).emit('pair-completed', { time: pair.completionTime, tone: details?.tone, diff: details?.diff });
+    this.io.to(playerId).emit('pair-completed', { time: pair.completionTime, tone: details?.tone, diff: details?.diff, color: pair.color });
+    this.io.to(partnerId).emit('pair-completed', { time: pair.completionTime, tone: details?.tone, diff: details?.diff, color: pair.color });
 
     console.log(`Pair completed: ${playerId} and ${partnerId} in ${pair.completionTime}ms`);
 
