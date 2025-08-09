@@ -37,8 +37,8 @@ export class GameManager {
   private game: GameState;
   private roundTimer: NodeJS.Timeout | null = null;
   
-  // should be possible? idk about everyone's ears
-  private allTones = [350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125, 1150, 1175, 1200, 1225, 1250, 1275, 1300, 1325];
+  //will expand later, but my previous range was too narrow
+  private allTones = [550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200];
   private usedTones: Set<number> = new Set();
 
   constructor(io: Server) {
@@ -119,7 +119,8 @@ export class GameManager {
     const isCorrect = Math.abs(frequency - player.assignedTone) <= 10;
     
     if (isCorrect) {
-      this.completePair(player.id, partner.id);
+      const diff = Math.round(Math.abs(frequency - player.assignedTone));
+      this.completePair(player.id, partner.id, { tone: player.assignedTone, diff });
     } else {
       socket.emit('tone-incorrect');
     }
@@ -215,7 +216,7 @@ export class GameManager {
     }
   }
 
-  private completePair(playerId: string, partnerId: string) {
+  private completePair(playerId: string, partnerId: string, details?: { tone: number; diff: number }) {
     const player = this.game.players.get(playerId);
     const partner = this.game.players.get(partnerId);
     const pair = this.game.currentPairs.find(
@@ -233,8 +234,8 @@ export class GameManager {
     player.completionTime = pair.completionTime;
     partner.completionTime = pair.completionTime;
 
-    this.io.to(playerId).emit('pair-completed', { time: pair.completionTime });
-    this.io.to(partnerId).emit('pair-completed', { time: pair.completionTime });
+    this.io.to(playerId).emit('pair-completed', { time: pair.completionTime, tone: details?.tone, diff: details?.diff });
+    this.io.to(partnerId).emit('pair-completed', { time: pair.completionTime, tone: details?.tone, diff: details?.diff });
 
     console.log(`Pair completed: ${playerId} and ${partnerId} in ${pair.completionTime}ms`);
 
@@ -259,6 +260,18 @@ export class GameManager {
     const uncompletedPairs = this.game.currentPairs.filter(pair => !pair.completed);
     
     const totalPairs = this.game.currentPairs.length;
+    if (totalPairs === 1) {
+      const onlyPair = this.game.currentPairs[0];
+      if (onlyPair.completed) {
+        const p1 = this.game.players.get(onlyPair.player1);
+        const p2 = this.game.players.get(onlyPair.player2);
+        if (p1) p1.state = PlayerState.WAITING;
+        if (p2) p2.state = PlayerState.WAITING;
+        this.game.currentPairs = [];
+        this.endGame();
+        return;
+      }
+    }
     const eliminateCount = Math.max(1, Math.floor(totalPairs * 0.2));
     
     const pairsToEliminate = [

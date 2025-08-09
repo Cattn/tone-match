@@ -53,6 +53,14 @@ class ToneMatchClient {
             this.isRecording = false;
             this.stopToneDetection();
             this.showCompletionState();
+            if (typeof data.diff === 'number' && typeof data.tone === 'number') {
+                console.log('Matched tone', data.tone, 'difference', data.diff, 'Hz');
+                const el = document.getElementById('completion-state');
+                if (el) {
+                    el.setAttribute('data-diff', String(data.diff));
+                    el.setAttribute('data-tone', String(data.tone));
+                }
+            }
             setTimeout(() => {
                 this.showWaitingState();
             }, 3000);
@@ -125,6 +133,17 @@ class ToneMatchClient {
         this.hideAllStates();
         document.getElementById('completion-state').classList.remove('hidden');
         document.getElementById('completion-state').classList.add('fade-in');
+        const diffEl = document.getElementById('completion-diff');
+        const container = document.getElementById('completion-state');
+        if (diffEl && container) {
+            const diff = container.getAttribute('data-diff');
+            const tone = container.getAttribute('data-tone');
+            if (diff && tone) {
+                diffEl.textContent = `Δ ${diff} Hz from ${tone} Hz`;
+            } else {
+                diffEl.textContent = '';
+            }
+        }
     }
     
     showEliminationState() {
@@ -163,7 +182,9 @@ class ToneMatchClient {
             this.oscillator.frequency.setValueAtTime(this.currentTone, this.audioContext.currentTime);
             this.oscillator.type = 'sine';
             
-            gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+            const t0 = this.audioContext.currentTime;
+            gainNode.gain.setValueAtTime(0.0, t0);
+            gainNode.gain.linearRampToValueAtTime(0.3, t0 + 0.02);
             
             this.oscillator.start();
             this.isPlaying = true;
@@ -172,6 +193,10 @@ class ToneMatchClient {
             
 
             setTimeout(() => {
+                if (this.oscillator) {
+                    const t1 = this.audioContext.currentTime;
+                    const gainNode2 = this.oscillator.context.createGain();
+                }
                 this.stopTone();
             }, 2000);
             
@@ -183,7 +208,17 @@ class ToneMatchClient {
     stopTone() {
         if (this.oscillator) {
             try {
-                this.oscillator.stop();
+                const ctx = this.audioContext;
+                const t = ctx.currentTime;
+                const gainNode = this.oscillator.context.createGain();
+                try {
+                    this.oscillator.disconnect();
+                } catch (e) {}
+                this.oscillator.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                gainNode.gain.setValueAtTime(0.3, t);
+                gainNode.gain.linearRampToValueAtTime(0.0, t + 0.03);
+                this.oscillator.stop(t + 0.04);
             } catch (error) {
             }
             this.oscillator = null;
