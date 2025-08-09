@@ -9,6 +9,10 @@ class ToneMatchClient {
         this.currentTone = null;
         this.isRecording = false;
         this.isPlaying = false;
+        this.recordTimeoutId = null;
+        this.currentStream = null;
+        this.lastEmitTime = 0;
+        this.detectionRAFId = null;
         
         this.setupAudio();
         this.setupSocketEvents();
@@ -39,7 +43,15 @@ class ToneMatchClient {
             this.startToneDetection();
         });
         
+        this.socket.on('recording-stopped', () => {
+            this.isRecording = false;
+            this.stopToneDetection();
+            this.updateRecordButton();
+        });
+        
         this.socket.on('pair-completed', (data) => {
+            this.isRecording = false;
+            this.stopToneDetection();
             this.showCompletionState();
             setTimeout(() => {
                 this.showWaitingState();
@@ -83,7 +95,9 @@ class ToneMatchClient {
         });
         
         document.getElementById('record-btn').addEventListener('click', () => {
-            if (!this.isRecording) {
+            if (this.isRecording) {
+                this.stopRecording();
+            } else {
                 this.startRecording();
             }
         });
@@ -184,6 +198,15 @@ class ToneMatchClient {
         this.stopTone();
         this.socket.emit('start-recording');
         this.updateRecordButton();
+        if (this.recordTimeoutId) {
+            clearTimeout(this.recordTimeoutId);
+            this.recordTimeoutId = null;
+        }
+        this.recordTimeoutId = setTimeout(() => {
+            if (this.isRecording) {
+                this.stopRecording();
+            }
+        }, 4000);
     }
     
     updateRecordButton() {
@@ -203,6 +226,7 @@ class ToneMatchClient {
         
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.currentStream = stream;
             const analyser = this.audioContext.createAnalyser();
             const microphone = this.audioContext.createMediaStreamSource(stream);
             
@@ -220,27 +244,29 @@ class ToneMatchClient {
                 }
                 
                 analyser.getByteFrequencyData(dataArray);
-                
-
-                let maxIndex = 0;
+                const sampleRate = this.audioContext.sampleRate;
+                const nyquist = sampleRate / 2;
+                const hzPerBin = nyquist / bufferLength;
+                const minHz = 200;
+                const maxHz = 2000;
+                const startBin = Math.max(0, Math.floor(minHz / hzPerBin));
+                const endBin = Math.min(bufferLength - 1, Math.ceil(maxHz / hzPerBin));
+                let maxIndex = startBin;
                 let maxValue = 0;
-                
-                for (let i = 0; i < bufferLength; i++) {
+                for (let i = startBin; i <= endBin; i++) {
                     if (dataArray[i] > maxValue) {
                         maxValue = dataArray[i];
                         maxIndex = i;
                     }
                 }
-                
-
-                const frequency = (maxIndex * this.audioContext.sampleRate) / (analyser.fftSize * 2);
-                
-
-                if (maxValue > 100 && frequency > 100) {
+                const frequency = maxIndex * hzPerBin;
+                const now = performance.now();
+                if (maxValue > 110 && frequency >= minHz && frequency <= maxHz && now - this.lastEmitTime > 150) {
+                    this.lastEmitTime = now;
+                    console.log('Detected frequency', Math.round(frequency), 'amp', maxValue);
                     this.socket.emit('heard-tone', frequency);
                 }
-                
-                requestAnimationFrame(detectTone);
+                this.detectionRAFId = requestAnimationFrame(detectTone);
             };
             
             detectTone();
@@ -248,6 +274,32 @@ class ToneMatchClient {
         } catch (error) {
             console.error('Error accessing microphone:', error);
         }
+    }
+
+    stopToneDetection() {
+        if (this.detectionRAFId) {
+            cancelAnimationFrame(this.detectionRAFId);
+            this.detectionRAFId = null;
+        }
+        if (this.currentStream) {
+            try {
+                this.currentStream.getTracks().forEach(t => t.stop());
+            } catch (e) {}
+            this.currentStream = null;
+        }
+        if (this.recordTimeoutId) {
+            clearTimeout(this.recordTimeoutId);
+            this.recordTimeoutId = null;
+        }
+    }
+
+    stopRecording() {
+        if (!this.isRecording) return;
+        this.isRecording = false;
+        this.stopToneDetection();
+        this.socket.emit('cancel-recording');
+        this.updateRecordButton();
+        console.log('Recording stopped');
     }
 }
 

@@ -59,6 +59,7 @@ export class GameManager {
 
       socket.on('join', () => this.addPlayer(socket));
       socket.on('start-recording', () => this.startRecording(socket));
+      socket.on('cancel-recording', () => this.cancelRecording(socket));
       socket.on('heard-tone', (frequency: number) => this.heardTone(socket, frequency));
       
       socket.on('disconnect', () => this.removePlayer(socket));
@@ -121,6 +122,17 @@ export class GameManager {
       this.completePair(player.id, partner.id);
     } else {
       socket.emit('tone-incorrect');
+    }
+  }
+
+  private cancelRecording(socket: Socket) {
+    const player = this.game.players.get(socket.id);
+    if (!player) {
+      return;
+    }
+    if (player.state === PlayerState.RECORDING) {
+      player.state = PlayerState.PLAYING;
+      this.io.to(socket.id).emit('recording-stopped');
     }
   }
 
@@ -317,6 +329,10 @@ export class GameManager {
     setTimeout(() => {
       this.resetGame();
     }, 10000);
+  }
+
+  public forceEndGame() {
+    this.endGame();
   }
 
   private resetGame() {

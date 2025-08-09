@@ -43,6 +43,17 @@ app.post('/admin/start-game', (req, res) => {
   }
 });
 
+app.post('/admin/end-game', (req, res) => {
+  const { password } = req.body;
+
+  if (password !== 'SHIPWRECKED113') {
+    return res.status(401).json({ error: 'Invalid password' });
+  }
+
+  gameManager.forceEndGame();
+  res.json({ success: true, message: 'Game ending' });
+});
+
 app.get('/admin/stats', (req, res) => {
   const { password } = req.query;
   

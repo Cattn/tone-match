@@ -32,6 +32,10 @@ class AdminPanel {
         document.getElementById('auto-refresh-btn').addEventListener('click', () => {
             this.toggleAutoRefresh();
         });
+
+        document.getElementById('end-game-btn').addEventListener('click', () => {
+            this.endGame();
+        });
         
         document.getElementById('logout-btn').addEventListener('click', () => {
             this.logout();
@@ -132,6 +136,28 @@ class AdminPanel {
                 this.refreshStats();
             } else {
                 this.showAdminError(result.error || 'Failed to start game');
+            }
+        } catch (error) {
+            this.showAdminError('Connection error. Please check if the server is running.');
+        }
+    }
+
+    async endGame() {
+        if (!this.password) return;
+        try {
+            const response = await fetch(this.apiBaseUrl + '/admin/end-game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password: this.password })
+            });
+            const result = await response.json();
+            if (response.ok) {
+                this.showAdminMessage(result.message || 'Game ending');
+                this.refreshStats();
+            } else {
+                this.showAdminError(result.error || 'Failed to end game');
             }
         } catch (error) {
             this.showAdminError('Connection error. Please check if the server is running.');
