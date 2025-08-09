@@ -133,17 +133,7 @@ class ToneMatchClient {
         this.hideAllStates();
         document.getElementById('completion-state').classList.remove('hidden');
         document.getElementById('completion-state').classList.add('fade-in');
-        const diffEl = document.getElementById('completion-diff');
-        const container = document.getElementById('completion-state');
-        if (diffEl && container) {
-            const diff = container.getAttribute('data-diff');
-            const tone = container.getAttribute('data-tone');
-            if (diff && tone) {
-                diffEl.textContent = `Δ ${diff} Hz from ${tone} Hz`;
-            } else {
-                diffEl.textContent = '';
-            }
-        }
+        // don't know if I can really get across a "end screen" with no text
     }
     
     showEliminationState() {

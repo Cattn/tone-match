@@ -38,7 +38,7 @@ export class GameManager {
   private roundTimer: NodeJS.Timeout | null = null;
   
   //will expand later, but my previous range was too narrow
-  private allTones = [550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200];
+  private allTones = [520, 540, 560, 580, 600, 620, 640, 660, 680, 700, 720, 740, 760, 780, 800, 820, 840, 860, 880, 900, 920, 940, 960, 980, 1000, 1020, 1040, 1060, 1080, 1100, 1120, 1140, 1160, 1180, 1200, 1220, 1240, 1260, 1280];
   private usedTones: Set<number> = new Set();
 
   constructor(io: Server) {
@@ -150,10 +150,13 @@ export class GameManager {
     this.usedTones.clear();
 
     const shuffled = [...activePlayers].sort(() => Math.random() - 0.5);
-    
-    for (let i = 0; i < shuffled.length - 1; i += 2) {
-      const player1 = shuffled[i];
-      const player2 = shuffled[i + 1];
+    const maxPairs = Math.floor(this.allTones.length);
+    const plannedPairs = Math.min(Math.floor(shuffled.length / 2), maxPairs);
+    const pairablePlayers = shuffled.slice(0, plannedPairs * 2);
+
+    for (let i = 0; i < pairablePlayers.length - 1; i += 2) {
+      const player1 = pairablePlayers[i];
+      const player2 = pairablePlayers[i + 1];
       
       const sharedTone = this.getUniqueTone();
       
@@ -201,19 +204,9 @@ export class GameManager {
     return tone;
   }
 
-  // automatically gets harder as more people are added (we have a limited # of tones, but also don't want to space out too far, otherwise it would be easy.)
+  // is aready used or not
   private getAvailableTones(): number[] {
-    const usedCount = this.usedTones.size;
-    
-    if (usedCount < 10) {
-      const wideTones = this.allTones.filter((_, index) => index % 4 === 0);
-      return wideTones.filter(tone => !this.usedTones.has(tone));
-    } else if (usedCount < 20) {
-      const mediumTones = this.allTones.filter((_, index) => index % 2 === 0);
-      return mediumTones.filter(tone => !this.usedTones.has(tone));
-    } else {
-      return this.allTones.filter(tone => !this.usedTones.has(tone));
-    }
+    return this.allTones.filter(tone => !this.usedTones.has(tone));
   }
 
   private completePair(playerId: string, partnerId: string, details?: { tone: number; diff: number }) {
@@ -268,7 +261,7 @@ export class GameManager {
         if (p1) p1.state = PlayerState.WAITING;
         if (p2) p2.state = PlayerState.WAITING;
         this.game.currentPairs = [];
-        this.endGame();
+        setTimeout(() => this.endGame(), 3000);
         return;
       }
     }
