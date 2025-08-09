@@ -13,6 +13,8 @@ class ToneMatchClient {
         this.currentStream = null;
         this.lastEmitTime = 0;
         this.detectionRAFId = null;
+        this.lastCompletionShownAt = 0;
+        this.pendingStateTimeoutId = null;
         
         this.setupAudio();
         this.setupSocketEvents();
@@ -22,6 +24,15 @@ class ToneMatchClient {
     async setupAudio() {
         try {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const unlock = () => {
+                if (this.audioContext && this.audioContext.state !== 'running') {
+                    this.audioContext.resume().catch(() => {});
+                }
+                document.removeEventListener('touchend', unlock, true);
+                document.removeEventListener('click', unlock, true);
+            };
+            document.addEventListener('touchend', unlock, true);
+            document.addEventListener('click', unlock, true);
         } catch (error) {
             console.error('Audio context creation failed:', error);
         }
@@ -63,6 +74,7 @@ class ToneMatchClient {
             this.isRecording = false;
             this.stopToneDetection();
             this.showCompletionState();
+            this.lastCompletionShownAt = performance.now();
             if (typeof data.diff === 'number' && typeof data.tone === 'number') {
                 console.log('Matched tone', data.tone, 'difference', data.diff, 'Hz');
                 const el = document.getElementById('completion-state');
@@ -71,9 +83,14 @@ class ToneMatchClient {
                     el.setAttribute('data-tone', String(data.tone));
                 }
             }
-            setTimeout(() => {
+            if (this.pendingStateTimeoutId) {
+                clearTimeout(this.pendingStateTimeoutId);
+                this.pendingStateTimeoutId = null;
+            }
+            this.pendingStateTimeoutId = setTimeout(() => {
+                this.pendingStateTimeoutId = null;
                 this.showWaitingState();
-            }, 3000);
+            }, 1500);
         });
         
         this.socket.on('tone-incorrect', () => {
@@ -96,7 +113,18 @@ class ToneMatchClient {
             this.stopTone();
             this.updateRecordButton();
             this.currentTone = null;
-            this.showWaitingState();
+            const now = performance.now();
+            const minDisplayMs = 1000;
+            const elapsed = now - this.lastCompletionShownAt;
+            const delay = this.lastCompletionShownAt > 0 && elapsed < minDisplayMs ? (minDisplayMs - elapsed) : 0;
+            if (this.pendingStateTimeoutId) {
+                clearTimeout(this.pendingStateTimeoutId);
+                this.pendingStateTimeoutId = null;
+            }
+            this.pendingStateTimeoutId = setTimeout(() => {
+                this.pendingStateTimeoutId = null;
+                this.showWaitingState();
+            }, delay);
         });
         
         this.socket.on('game-ended', (data) => {
@@ -105,7 +133,18 @@ class ToneMatchClient {
             this.stopTone();
             this.updateRecordButton();
             this.currentTone = null;
-            this.showWaitingState();
+            const now = performance.now();
+            const minDisplayMs = 1000;
+            const elapsed = now - this.lastCompletionShownAt;
+            const delay = this.lastCompletionShownAt > 0 && elapsed < minDisplayMs ? (minDisplayMs - elapsed) : 0;
+            if (this.pendingStateTimeoutId) {
+                clearTimeout(this.pendingStateTimeoutId);
+                this.pendingStateTimeoutId = null;
+            }
+            this.pendingStateTimeoutId = setTimeout(() => {
+                this.pendingStateTimeoutId = null;
+                this.showWaitingState();
+            }, delay);
         });
         
         this.socket.on('game-reset', () => {
@@ -114,6 +153,10 @@ class ToneMatchClient {
             this.stopTone();
             this.updateRecordButton();
             this.currentTone = null;
+            if (this.pendingStateTimeoutId) {
+                clearTimeout(this.pendingStateTimeoutId);
+                this.pendingStateTimeoutId = null;
+            }
             this.showJoinState();
         });
     }
@@ -123,11 +166,17 @@ class ToneMatchClient {
             this.socket.emit('join');
         });
         
-        document.getElementById('play-btn').addEventListener('click', () => {
+        document.getElementById('play-btn').addEventListener('click', async () => {
+            if (this.audioContext && this.audioContext.state !== 'running') {
+                try { await this.audioContext.resume(); } catch (e) {}
+            }
             this.toggleTonePlayback();
         });
         
-        document.getElementById('record-btn').addEventListener('click', () => {
+        document.getElementById('record-btn').addEventListener('click', async () => {
+            if (this.audioContext && this.audioContext.state !== 'running') {
+                try { await this.audioContext.resume(); } catch (e) {}
+            }
             if (this.isRecording) {
                 this.stopRecording();
             } else {
@@ -173,6 +222,7 @@ class ToneMatchClient {
             const element = document.getElementById(state);
             element.classList.add('hidden');
             element.classList.remove('fade-in');
+            element.offsetHeight;
         });
     }
     
@@ -208,10 +258,6 @@ class ToneMatchClient {
             
 
             setTimeout(() => {
-                if (this.oscillator) {
-                    const t1 = this.audioContext.currentTime;
-                    const gainNode2 = this.oscillator.context.createGain();
-                }
                 this.stopTone();
             }, 2000);
             
@@ -246,8 +292,9 @@ class ToneMatchClient {
         if (this.isRecording) return;
         
         this.stopTone();
-        this.socket.emit('start-recording');
+        this.isRecording = true;
         this.updateRecordButton();
+        this.socket.emit('start-recording');
         if (this.recordTimeoutId) {
             clearTimeout(this.recordTimeoutId);
             this.recordTimeoutId = null;
@@ -275,13 +322,13 @@ class ToneMatchClient {
         }
         
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
             this.currentStream = stream;
             const analyser = this.audioContext.createAnalyser();
             const microphone = this.audioContext.createMediaStreamSource(stream);
             
-            analyser.fftSize = 4096;
-            analyser.smoothingTimeConstant = 0.8;
+            analyser.fftSize = 8192;
+            analyser.smoothingTimeConstant = 0.85;
             microphone.connect(analyser);
             
             const bufferLength = analyser.frequencyBinCount;
@@ -297,8 +344,8 @@ class ToneMatchClient {
                 const sampleRate = this.audioContext.sampleRate;
                 const nyquist = sampleRate / 2;
                 const hzPerBin = nyquist / bufferLength;
-                const minHz = 200;
-                const maxHz = 2000;
+                const minHz = 300;
+                const maxHz = 2400;
                 const startBin = Math.max(0, Math.floor(minHz / hzPerBin));
                 const endBin = Math.min(bufferLength - 1, Math.ceil(maxHz / hzPerBin));
                 let maxIndex = startBin;
@@ -311,7 +358,7 @@ class ToneMatchClient {
                 }
                 const frequency = maxIndex * hzPerBin;
                 const now = performance.now();
-                if (maxValue > 110 && frequency >= minHz && frequency <= maxHz && now - this.lastEmitTime > 150) {
+                if (maxValue > 120 && frequency >= minHz && frequency <= maxHz && now - this.lastEmitTime > 180) {
                     this.lastEmitTime = now;
                     console.log('Detected frequency', Math.round(frequency), 'amp', maxValue);
                     this.socket.emit('heard-tone', frequency);
