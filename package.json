@@ -1,0 +1,27 @@
+{
+  "name": "tone-match",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "client:start": "node server.js",
+    "api:start": "cd api && npm run build && npm run start",
+    "start": "concurrently \"npm run client:start\" \"npm run api:start\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cattn/tone-match.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Cattn/tone-match/issues"
+  },
+  "homepage": "https://github.com/Cattn/tone-match#readme",
+  "dependencies": {
+    "concurrently": "^9.2.0",
+    "express": "^5.1.0"
+  }
+}
