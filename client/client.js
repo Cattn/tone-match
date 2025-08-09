@@ -6,6 +6,8 @@ class ToneMatchClient {
         this.socket = io(socketUrl);
         this.audioContext = null;
         this.oscillator = null;
+        this.masterGain = null;
+        this.toneGain = null;
         this.currentTone = null;
         this.isRecording = false;
         this.isPlaying = false;
@@ -24,10 +26,21 @@ class ToneMatchClient {
     async setupAudio() {
         try {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.masterGain = this.audioContext.createGain();
+            this.masterGain.gain.setValueAtTime(1.0, this.audioContext.currentTime);
+            this.masterGain.connect(this.audioContext.destination);
             const unlock = () => {
                 if (this.audioContext && this.audioContext.state !== 'running') {
                     this.audioContext.resume().catch(() => {});
                 }
+                try {
+                    const buffer = this.audioContext.createBuffer(1, 1, 22050);
+                    const source = this.audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(this.masterGain);
+                    source.start(0);
+                    source.disconnect();
+                } catch (e) {}
                 document.removeEventListener('touchend', unlock, true);
                 document.removeEventListener('click', unlock, true);
             };
@@ -242,17 +255,16 @@ class ToneMatchClient {
                 try { this.audioContext.resume(); } catch (e) {}
             }
             this.oscillator = this.audioContext.createOscillator();
-            const gainNode = this.audioContext.createGain();
-            
-            this.oscillator.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
+            this.toneGain = this.audioContext.createGain();
+            this.oscillator.connect(this.toneGain);
+            this.toneGain.connect(this.masterGain);
             
             this.oscillator.frequency.setValueAtTime(this.currentTone, this.audioContext.currentTime);
             this.oscillator.type = 'sine';
             
             const t0 = this.audioContext.currentTime;
-            gainNode.gain.setValueAtTime(0.0, t0);
-            gainNode.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
+            this.toneGain.gain.setValueAtTime(0.0, t0);
+            this.toneGain.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
             
             this.oscillator.start();
             this.isPlaying = true;
@@ -272,20 +284,16 @@ class ToneMatchClient {
     stopTone() {
         if (this.oscillator) {
             try {
-                const ctx = this.audioContext;
-                const t = ctx.currentTime;
-                const gainNode = this.oscillator.context.createGain();
-                try {
-                    this.oscillator.disconnect();
-                } catch (e) {}
-                this.oscillator.connect(gainNode);
-                gainNode.connect(ctx.destination);
-                gainNode.gain.setValueAtTime(0.3, t);
-                gainNode.gain.linearRampToValueAtTime(0.0, t + 0.03);
+                const t = this.audioContext.currentTime;
+                if (this.toneGain) {
+                    this.toneGain.gain.setValueAtTime(0.25, t);
+                    this.toneGain.gain.linearRampToValueAtTime(0.0, t + 0.03);
+                }
                 this.oscillator.stop(t + 0.04);
             } catch (error) {
             }
             this.oscillator = null;
+            this.toneGain = null;
         }
         this.isPlaying = false;
         document.getElementById('play-btn').classList.remove('play-active');
@@ -325,13 +333,13 @@ class ToneMatchClient {
         }
         
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 1 } });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             this.currentStream = stream;
             const analyser = this.audioContext.createAnalyser();
             const microphone = this.audioContext.createMediaStreamSource(stream);
             
-            analyser.fftSize = 4096;
-            analyser.smoothingTimeConstant = 0.8;
+            analyser.fftSize = 2048;
+            analyser.smoothingTimeConstant = 0.7;
             microphone.connect(analyser);
             
             const bufferLength = analyser.frequencyBinCount;
@@ -347,7 +355,7 @@ class ToneMatchClient {
                 const sampleRate = this.audioContext.sampleRate;
                 const nyquist = sampleRate / 2;
                 const hzPerBin = nyquist / bufferLength;
-                const minHz = 250;
+                const minHz = 200;
                 const maxHz = 2200;
                 const startBin = Math.max(0, Math.floor(minHz / hzPerBin));
                 const endBin = Math.min(bufferLength - 1, Math.ceil(maxHz / hzPerBin));
@@ -361,7 +369,7 @@ class ToneMatchClient {
                 }
                 const frequency = maxIndex * hzPerBin;
                 const now = performance.now();
-                if (maxValue > 90 && frequency >= minHz && frequency <= maxHz && now - this.lastEmitTime > 150) {
+                if (maxValue > 60 && frequency >= minHz && frequency <= maxHz && now - this.lastEmitTime > 120) {
                     this.lastEmitTime = now;
                     console.log('Detected frequency', Math.round(frequency), 'amp', maxValue);
                     this.socket.emit('heard-tone', frequency);
