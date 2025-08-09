@@ -6,6 +6,7 @@ class ToneMatchClient {
         this.socket = io(socketUrl);
         this.audioContext = null;
         this.oscillator = null;
+        this.bufferSource = null;
         this.masterGain = null;
         this.toneGain = null;
         this.currentTone = null;
@@ -254,19 +255,25 @@ class ToneMatchClient {
             if (this.audioContext.state !== 'running') {
                 try { this.audioContext.resume(); } catch (e) {}
             }
-            this.oscillator = this.audioContext.createOscillator();
+            const durationSec = 2.0;
+            const sampleRate = this.audioContext.sampleRate || 44100;
+            const length = Math.max(1, Math.floor(sampleRate * durationSec));
+            const buffer = this.audioContext.createBuffer(1, length, sampleRate);
+            const data = buffer.getChannelData(0);
+            const twoPiOverSr = 2 * Math.PI / sampleRate;
+            const freq = this.currentTone;
+            for (let i = 0; i < length; i++) {
+                data[i] = Math.sin(i * twoPiOverSr * freq);
+            }
+            this.bufferSource = this.audioContext.createBufferSource();
+            this.bufferSource.buffer = buffer;
             this.toneGain = this.audioContext.createGain();
-            this.oscillator.connect(this.toneGain);
+            this.bufferSource.connect(this.toneGain);
             this.toneGain.connect(this.masterGain);
-            
-            this.oscillator.frequency.setValueAtTime(this.currentTone, this.audioContext.currentTime);
-            this.oscillator.type = 'sine';
-            
             const t0 = this.audioContext.currentTime;
             this.toneGain.gain.setValueAtTime(0.0, t0);
             this.toneGain.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
-            
-            this.oscillator.start();
+            this.bufferSource.start();
             this.isPlaying = true;
             
             document.getElementById('play-btn').classList.add('play-active');
@@ -282,7 +289,19 @@ class ToneMatchClient {
     }
     
     stopTone() {
-        if (this.oscillator) {
+        if (this.bufferSource) {
+            try {
+                const t = this.audioContext.currentTime;
+                if (this.toneGain) {
+                    this.toneGain.gain.setValueAtTime(0.25, t);
+                    this.toneGain.gain.linearRampToValueAtTime(0.0, t + 0.03);
+                }
+                this.bufferSource.stop(t + 0.04);
+            } catch (error) {
+            }
+            this.bufferSource = null;
+            this.toneGain = null;
+        } else if (this.oscillator) {
             try {
                 const t = this.audioContext.currentTime;
                 if (this.toneGain) {
@@ -290,8 +309,7 @@ class ToneMatchClient {
                     this.toneGain.gain.linearRampToValueAtTime(0.0, t + 0.03);
                 }
                 this.oscillator.stop(t + 0.04);
-            } catch (error) {
-            }
+            } catch (error) {}
             this.oscillator = null;
             this.toneGain = null;
         }
