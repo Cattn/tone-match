@@ -102,7 +102,13 @@
             position: relative;
             -webkit-transform: translateZ(0);
             transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            will-change: transform, opacity;
+            overflow: hidden;
         }
+
+        .status-icon svg { display: block; contain: paint; }
         
         .hidden {
             display: none !important;

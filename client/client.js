@@ -238,6 +238,9 @@ class ToneMatchClient {
         if (!this.audioContext || !this.currentTone || this.isRecording) return;
         
         try {
+            if (this.audioContext.state !== 'running') {
+                try { this.audioContext.resume(); } catch (e) {}
+            }
             this.oscillator = this.audioContext.createOscillator();
             const gainNode = this.audioContext.createGain();
             
@@ -249,7 +252,7 @@ class ToneMatchClient {
             
             const t0 = this.audioContext.currentTime;
             gainNode.gain.setValueAtTime(0.0, t0);
-            gainNode.gain.linearRampToValueAtTime(0.3, t0 + 0.02);
+            gainNode.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
             
             this.oscillator.start();
             this.isPlaying = true;
@@ -322,13 +325,13 @@ class ToneMatchClient {
         }
         
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 1 } });
             this.currentStream = stream;
             const analyser = this.audioContext.createAnalyser();
             const microphone = this.audioContext.createMediaStreamSource(stream);
             
-            analyser.fftSize = 8192;
-            analyser.smoothingTimeConstant = 0.85;
+            analyser.fftSize = 4096;
+            analyser.smoothingTimeConstant = 0.8;
             microphone.connect(analyser);
             
             const bufferLength = analyser.frequencyBinCount;
@@ -344,8 +347,8 @@ class ToneMatchClient {
                 const sampleRate = this.audioContext.sampleRate;
                 const nyquist = sampleRate / 2;
                 const hzPerBin = nyquist / bufferLength;
-                const minHz = 300;
-                const maxHz = 2400;
+                const minHz = 250;
+                const maxHz = 2200;
                 const startBin = Math.max(0, Math.floor(minHz / hzPerBin));
                 const endBin = Math.min(bufferLength - 1, Math.ceil(maxHz / hzPerBin));
                 let maxIndex = startBin;
@@ -358,7 +361,7 @@ class ToneMatchClient {
                 }
                 const frequency = maxIndex * hzPerBin;
                 const now = performance.now();
-                if (maxValue > 120 && frequency >= minHz && frequency <= maxHz && now - this.lastEmitTime > 180) {
+                if (maxValue > 90 && frequency >= minHz && frequency <= maxHz && now - this.lastEmitTime > 150) {
                     this.lastEmitTime = now;
                     console.log('Detected frequency', Math.round(frequency), 'amp', maxValue);
                     this.socket.emit('heard-tone', frequency);
