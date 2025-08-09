@@ -29,11 +29,21 @@ class ToneMatchClient {
     
     setupSocketEvents() {
         this.socket.on('joined', (data) => {
+            this.isRecording = false;
+            this.stopToneDetection();
+            this.stopTone();
+            this.updateRecordButton();
             this.showWaitingState();
         });
         
         this.socket.on('round-start', (data) => {
             this.currentTone = data.tone;
+            this.isRecording = false;
+            this.stopToneDetection();
+            this.stopTone();
+            this.updateRecordButton();
+            const recordBtn = document.getElementById('record-btn');
+            if (recordBtn) recordBtn.style.borderColor = '#fff';
             this.showPlayingState();
         });
         
@@ -81,14 +91,29 @@ class ToneMatchClient {
         });
         
         this.socket.on('round-ended', (data) => {
+            this.isRecording = false;
+            this.stopToneDetection();
+            this.stopTone();
+            this.updateRecordButton();
+            this.currentTone = null;
             this.showWaitingState();
         });
         
         this.socket.on('game-ended', (data) => {
+            this.isRecording = false;
+            this.stopToneDetection();
+            this.stopTone();
+            this.updateRecordButton();
+            this.currentTone = null;
             this.showWaitingState();
         });
         
         this.socket.on('game-reset', () => {
+            this.isRecording = false;
+            this.stopToneDetection();
+            this.stopTone();
+            this.updateRecordButton();
+            this.currentTone = null;
             this.showJoinState();
         });
     }
