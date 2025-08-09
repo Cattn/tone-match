@@ -61,8 +61,7 @@ class ToneMatchClient {
             this.updateRecordButton();
             this.currentTone = null;
             this.currentColor = null;
-            const colorEl = document.getElementById('pair-color-indicator');
-            if (colorEl) colorEl.style.background = 'transparent';
+            document.body.style.backgroundColor = '#000';
             this.showWaitingState();
         });
         
@@ -75,8 +74,7 @@ class ToneMatchClient {
             this.updateRecordButton();
             const recordBtn = document.getElementById('record-btn');
             if (recordBtn) recordBtn.style.borderColor = '#fff';
-            const colorEl = document.getElementById('pair-color-indicator');
-            if (colorEl) colorEl.style.background = this.currentColor || 'transparent';
+            document.body.style.backgroundColor = this.currentColor || '#000';
             this.showPlayingState();
         });
         
@@ -139,8 +137,7 @@ class ToneMatchClient {
             this.updateRecordButton();
             this.currentTone = null;
             this.currentColor = null;
-            const colorEl = document.getElementById('pair-color-indicator');
-            if (colorEl) colorEl.style.background = 'transparent';
+            document.body.style.backgroundColor = '#000';
             const now = performance.now();
             const minDisplayMs = 1000;
             const elapsed = now - this.lastCompletionShownAt;
@@ -162,8 +159,7 @@ class ToneMatchClient {
             this.updateRecordButton();
             this.currentTone = null;
             this.currentColor = null;
-            const colorEl = document.getElementById('pair-color-indicator');
-            if (colorEl) colorEl.style.background = 'transparent';
+            document.body.style.backgroundColor = '#000';
             const now = performance.now();
             const minDisplayMs = 1000;
             const elapsed = now - this.lastCompletionShownAt;
@@ -185,8 +181,7 @@ class ToneMatchClient {
             this.updateRecordButton();
             this.currentTone = null;
             this.currentColor = null;
-            const colorEl = document.getElementById('pair-color-indicator');
-            if (colorEl) colorEl.style.background = 'transparent';
+            document.body.style.backgroundColor = '#000';
             if (this.pendingStateTimeoutId) {
                 clearTimeout(this.pendingStateTimeoutId);
                 this.pendingStateTimeoutId = null;

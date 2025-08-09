@@ -13,6 +13,7 @@
             background: #000;
             height: 100vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             font-family: Arial, sans-serif;
@@ -40,11 +41,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.35);
         }
         
         .game-button:hover {
             border-color: #4CAF50;
             transform: scale(1.1);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.45);
         }
         
         .game-button:active {
@@ -109,6 +112,9 @@
         }
 
         .status-icon svg { display: block; contain: paint; }
+        .status-icon svg { filter: drop-shadow(0 3px 10px rgba(0,0,0,0.5)); }
+
+        .game-button > div { filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45)); }
         
         .hidden {
             display: none !important;
@@ -229,41 +235,38 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <div id="join-state" class="fade-in">
-            <button id="join-btn" class="game-button">
-                <div style="width: 60px; height: 60px; border: 2px solid #fff; border-radius: 50%;"></div>
+    <div id="join-state" class="fade-in">
+        <button id="join-btn" class="game-button">
+            <div style="width: 60px; height: 60px; border: 2px solid #fff; border-radius: 50%;"></div>
+        </button>
+    </div>
+    
+    <div id="waiting-state" class="hidden">
+        <div class="clock" id="waiting-clock"></div>
+    </div>
+    
+    <div id="playing-state" class="hidden">
+        <div class="controls">
+            <button id="play-btn" class="game-button">
+                <div style="width: 0; height: 0; border-left: 20px solid #fff; border-top: 15px solid transparent; border-bottom: 15px solid transparent; margin-left: 5px;"></div>
+            </button>
+            
+            <button id="record-btn" class="game-button">
+                <div style="width: 20px; height: 20px; background: #fff; border-radius: 50%;"></div>
             </button>
         </div>
-        
-        <div id="waiting-state" class="hidden">
-            <div class="clock" id="waiting-clock"></div>
+    </div>
+    
+    <div id="completion-state" class="hidden">
+        <div class="status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#93d06b" d="m10.6 13.8l-2.15-2.15q-.275-.275-.7-.275t-.7.275t-.275.7t.275.7L9.9 15.9q.3.3.7.3t.7-.3l5.65-5.65q.275-.275.275-.7t-.275-.7t-.7-.275t-.7.275zM12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg>
         </div>
         
-        <div id="playing-state" class="hidden">
-            <div class="controls">
-                <button id="play-btn" class="game-button">
-                    <div style="width: 0; height: 0; border-left: 20px solid #fff; border-top: 15px solid transparent; border-bottom: 15px solid transparent; margin-left: 5px;"></div>
-                </button>
-                
-                <button id="record-btn" class="game-button">
-                    <div style="width: 20px; height: 20px; background: #fff; border-radius: 50%;"></div>
-                </button>
-            </div>
-            <div id="pair-color-indicator" style="margin-top: 10px; width: 28px; height: 28px; border-radius: 6px; border: 2px solid #fff; background: transparent; display: inline-block;"></div>
-        </div>
-        
-        <div id="completion-state" class="hidden">
-            <div class="status-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#93d06b" d="m10.6 13.8l-2.15-2.15q-.275-.275-.7-.275t-.7.275t-.275.7t.275.7L9.9 15.9q.3.3.7.3t.7-.3l5.65-5.65q.275-.275.275-.7t-.275-.7t-.7-.275t-.7.275zM12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg>
-            </div>
-            
-        </div>
-        
-        <div id="elimination-state" class="hidden">
-            <div class="status-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#972720" d="m12 13.4l2.9 2.9q.275.275.7.275t.7-.275t.275-.7t-.275-.7L13.4 12l2.9-2.9q.275-.275.275-.7t-.275-.7t-.7-.275t-.7.275L12 10.6L9.1 7.7q-.275-.275-.7-.275t-.7.275t-.275.7t.275.7l2.9 2.9l-2.9 2.9q-.275.275-.275.7t.275.7t.7.275t.7-.275zm0 8.6q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg>
-            </div>
+    </div>
+    
+    <div id="elimination-state" class="hidden">
+        <div class="status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#972720" d="m12 13.4l2.9 2.9q.275.275.7.275t.7-.275t.275-.7t-.275-.7L13.4 12l2.9-2.9q.275-.275.275-.7t-.275-.7t-.7-.275t-.7.275L12 10.6L9.1 7.7q-.275-.275-.7-.275t-.7.275t-.275.7t.275.7l2.9 2.9l-2.9 2.9q-.275.275-.275.7t.275.7t.7.275t.7-.275zm0 8.6q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22m0-2q3.35 0 5.675-2.325T20 12t-2.325-5.675T12 4T6.325 6.325T4 12t2.325 5.675T12 20m0-8"/></svg>
         </div>
     </div>
     
